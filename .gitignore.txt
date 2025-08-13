@@ -1,0 +1,25 @@
+# Build artifacts
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+
+# Các file thực thi và object
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+*.su
+
+# Thư viện HAL và các driver được tạo tự động bởi CubeMX
+Drivers/
+Middlewares/
+
+# Các file tạm của một số IDE
+*.bak
+*.swp
+*~
+.DS_Store
+
+# User-specific files of STM32CubeIDE
+.mxproject

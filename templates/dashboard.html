@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard - Chi tiết Cảm biến</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <style>
+        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #495057; }
+        .dashboard-container { background: rgba(255, 255, 255, 0.85); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); margin: 20px; padding: 30px; }
+        .header-title { font-weight: bold; margin-bottom: 5px; color: #343a40; }
+        .sensor-name-subtitle { font-size: 1.2rem; font-weight: 500; color: #6c757d; margin-bottom: 30px; }
+        .last-update { color: #6c757d; font-size: 0.9rem; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; animation: pulse 2s infinite; }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; animation: none; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); } }
+        .metric-card { background: #ffffff; border: none; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); transition: transform 0.3s ease, box-shadow 0.3s ease; margin-bottom: 20px; }
+        .metric-card:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .metric-icon { font-size: 2.5rem; margin-bottom: 15px; background: linear-gradient(45deg, #6B73FF, #000DFF); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .metric-value { font-size: 2.2rem; font-weight: bold; color: #212529; }
+        .metric-label { font-size: 1rem; color: #6c757d; }
+        .main-display-card { background: #fff; border-radius: 18px; padding: 25px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08); display: flex; height: 100%; }
+        .gauge-section { text-align: center; display: flex; flex-direction: column; justify-content: center; position: relative; }
+        .advice-section { padding-left: 25px; display: flex; flex-direction: column; justify-content: center; }
+        .radial-gauge-canvas-container { position: relative; width: 220px; height: 220px; margin: 15px auto; }
+        .radial-gauge-text-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; }
+        .radial-gauge-value { font-size: 3.5rem; font-weight: 700; line-height: 1; }
+        .radial-gauge-level { font-size: 1.2rem; font-weight: 500; margin-top: 5px; }
+        #recommendations { padding-left: 1.2rem; }
+        #recommendations li { margin-bottom: 5px; }
+        .forecast-chart-container { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.05); }
+        .nav-tabs { border-bottom: 1px solid #dee2e6; }
+        .nav-tabs .nav-link { color: #495057; font-weight: 600; border: none; border-bottom: 3px solid transparent; padding: 1rem; }
+        .nav-tabs .nav-link.active { color: #0d6efd; border-bottom-color: #0d6efd; background-color: transparent; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="dashboard-container">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-12 text-center">
+                    <h1 class="header-title"><i class="fas fa-satellite-dish me-3"></i>Dashboard Chi tiết Cảm biến</h1>
+                    <h2 class="sensor-name-subtitle" id="sensorNameSubtitle">Đang tải...</h2>
+                    <div class="last-update">
+                        <span id="statusIndicator" class="status-indicator status-offline"></span>
+                        Cập nhật lần cuối: <span id="lastUpdate">Đang chờ dữ liệu...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Cards -->
+            <div class="row mb-4">
+                <div class="col"><div class="card metric-card text-center"><div class="card-body"><i class="fas fa-thermometer-half metric-icon"></i><div class="metric-value" id="tempC">-</div><div class="metric-label">Nhiệt độ (°C)</div></div></div></div>
+                <div class="col"><div class="card metric-card text-center"><div class="card-body"><i class="fas fa-tint metric-icon"></i><div class="metric-value" id="humidity">-</div><div class="metric-label">Độ ẩm (%)</div></div></div></div>
+                <div class="col"><div class="card metric-card text-center"><div class="card-body"><i class="fas fa-smog metric-icon"></i><div class="metric-value" id="dustValue">-</div><div class="metric-label">Nồng độ Bụi</div></div></div></div>
+                <div class="col"><div class="card metric-card text-center"><div class="card-body"><i class="fas fa-lungs metric-icon"></i><div class="metric-value" id="pollutionLevel">-</div><div class="metric-label">Mức độ ô nhiễm</div></div></div></div>
+                <div class="col"><div class="card metric-card text-center"><div class="card-body"><i class="fas fa-shield-alt metric-icon"></i><div class="metric-value" id="aqiValue">-</div><div class="metric-label">Chỉ số AQI</div></div></div></div>
+            </div>
+
+            <!-- Gauge và Lời khuyên -->
+            <div class="row mb-4">
+                <div class="col-lg-8 mb-4 mb-lg-0">
+                    <div class="main-display-card">
+                        <div class="row w-100 align-items-center">
+                            <div class="col-md-6 gauge-section border-end">
+                                <div class="radial-gauge-canvas-container">
+                                    <canvas id="aqiGauge"></canvas>
+                                    <div class="radial-gauge-text-overlay">
+                                        <div class="radial-gauge-value" id="gaugeAqiValue">-</div>
+                                        <div class="radial-gauge-level" id="gaugeAqiLevel">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 advice-section">
+                                <h5 id="alertTitle"><i class="fas fa-info-circle me-2"></i>Chất lượng không khí</h5>
+                                <p id="pollutionMessage" class="mb-2">Đang chờ dữ liệu...</p>
+                                <h6 id="recommendationsTitle" class="mt-3"><i class="fas fa-lightbulb me-2"></i>Khuyến nghị:</h6>
+                                <ul id="recommendations" class="mb-0"><li>Vui lòng chờ...</li></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="main-display-card gauge-section">
+                         <h5 class="fw-bold mb-3"><i class="fas fa-brain me-2"></i>Mức ảnh hưởng Sức khỏe (AI)</h5>
+                         <div class="radial-gauge-canvas-container" style="width: 180px; height: 180px;">
+                            <canvas id="healthScoreGauge"></canvas>
+                             <div class="radial-gauge-text-overlay">
+                                <div class="radial-gauge-value" id="healthScoreValue">-</div>
+                                <div class="radial-gauge-level" id="healthScoreLevel">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Forecast Chart Section -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="forecast-chart-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                             <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>Dự báo Thời tiết Chi tiết</h4>
+                            <ul class="nav nav-tabs" id="forecastTab" role="tablist"></ul>
+                        </div>
+                        <div style="height: 350px;">
+                            <canvas id="forecastChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <a href="/" class="btn btn-secondary"><i class="fas fa-map-marked-alt me-2"></i>Quay lại Bản đồ</a>
+                    <button class="btn btn-primary ms-2" onclick="fetchAllData()"><i class="fas fa-sync-alt me-2"></i>Làm mới Thủ công</button>
+                    <button class="btn btn-success ms-2" onclick="toggleAutoRefresh()"><i class="fas fa-play me-2"></i><span id="autoRefreshText">Bật Tự động làm mới</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const SENSOR_ID = urlParams.get('id') || '1';
+
+        let aqiGaugeChart, healthGaugeChart, forecastChart;
+        let autoRefreshInterval, isAutoRefresh = false;
+        
+
+        const API_LATEST = `/api/latest?id=${SENSOR_ID}`;
+        const API_FORECAST = `/api/forecast?id=${SENSOR_ID}`; 
+        const API_SENSORS = '/api/sensors';
+
+
+        async function fetchAllData() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            try {
+
+                const [sensorsRes, latestRes, forecastRes] = await Promise.all([
+                    fetch(API_SENSORS),
+                    fetch(API_LATEST), 
+                    fetch(API_FORECAST)
+                ]);
+
+                if (!sensorsRes.ok || !latestRes.ok || !forecastRes.ok) throw new Error('Một trong các API không phản hồi thành công.');
+                
+                const sensorsList = await sensorsRes.json();
+                const latestData = await latestRes.json();
+                const forecastData = await forecastRes.json();
+                
+                const currentSensor = sensorsList.find(s => s.id == SENSOR_ID);
+                if (currentSensor) {
+                    document.getElementById('sensorNameSubtitle').textContent = `cho: ${currentSensor.name}`;
+                }
+
+                updateLatestUI(latestData);
+                updateForecastUI(forecastData);
+
+                statusIndicator.className = 'status-indicator status-online';
+                document.getElementById('lastUpdate').textContent = `Dữ liệu cảm biến lúc ${new Date(latestData.timestamp).toLocaleString('vi-VN')}`;
+            } catch (error) {
+                console.error('Lỗi khi lấy dữ liệu từ server:', error);
+                statusIndicator.className = 'status-indicator status-offline';
+                document.getElementById('lastUpdate').textContent = `Lỗi kết nối - ${new Date().toLocaleString('vi-VN')}`;
+            }
+        }
+        
+        function updateLatestUI(data) {
+            if (!data || data.error) return;
+
+            document.getElementById('tempC').textContent = data.temperature_C.toFixed(1);
+            document.getElementById('humidity').textContent = data.humidity.toFixed(1);
+            document.getElementById('dustValue').textContent = data.dust.toFixed(1);
+
+            if (data.aqi) {
+                const { aqi, level } = data.aqi;
+                const color = getAqiColor(level);
+
+                document.getElementById('pollutionLevel').textContent = level;
+                document.getElementById('aqiValue').textContent = aqi;
+
+                updateRadialGauge(aqiGaugeChart, 'gaugeAqiValue', 'gaugeAqiLevel', aqi, level, color);
+                updatePollutionAlert(data.aqi);
+            }
+        }
+        
+        function updateForecastUI(data) {
+            if (!data || data.error) return;
+
+            if (data.health_score !== null) {
+                const score = Math.round(data.health_score);
+                const { level, color } = getHealthScoreInfo(score);
+                updateRadialGauge(healthGaugeChart, 'healthScoreValue', 'healthScoreLevel', score, level, color);
+            }
+
+            const forecast = data.weather_forecast;
+            if (forecast && forecast.forecast_days) {
+                const tabContainer = document.getElementById('forecastTab');
+                tabContainer.innerHTML = forecast.forecast_days.map((day, index) => `<li class="nav-item" role="presentation"><button class="nav-link ${index === 0 ? 'active' : ''}" data-day-index="${index}" type="button">${day.day_name}</button></li>`).join('');
+                
+                updateForecastChart(forecast.forecast_days[0]);
+
+                tabContainer.querySelectorAll('.nav-link').forEach(tab => {
+                    tab.addEventListener('click', (event) => {
+                        const dayIndex = event.target.getAttribute('data-day-index');
+                        updateForecastChart(forecast.forecast_days[dayIndex]);
+                        tabContainer.querySelector('.active').classList.remove('active');
+                        event.target.classList.add('active');
+                    });
+                });
+            }
+        }
+        
+        function updateRadialGauge(chart, valueId, levelId, value, level, color) { 
+            if (!chart) return;
+            document.getElementById(valueId).textContent = value;
+            document.getElementById(levelId).textContent = level;
+            document.getElementById(valueId).style.color = color;
+            document.getElementById(levelId).style.color = color;
+            const maxValue = chart.options.plugins.customOptions.maxValue;
+            chart.data.datasets[0].data = [value, maxValue - value];
+            chart.data.datasets[0].backgroundColor = [color, '#e9ecef'];
+            chart.update('none');
+        }
+
+        function updateForecastChart(dayData) { 
+            if (!forecastChart || !dayData) return;
+            forecastChart.data.labels = dayData.hourly.map(h => h.time);
+            forecastChart.data.datasets[0].data = dayData.hourly.map(h => h.temp);
+            forecastChart.data.datasets[1].data = dayData.hourly.map(h => h.rain_chance);
+            forecastChart.options.plugins.tooltip.customData = dayData.hourly.map(h => h.condition);
+            forecastChart.update();
+        }
+
+        function updatePollutionAlert(aqiInfo) {
+            const level = aqiInfo.level;
+            const titleEl = document.getElementById('alertTitle');
+            const color = getAqiColor(level);
+            const recommendations = { 'Tốt': ['Mở cửa sổ để thông gió', 'Thời gian lý tưởng cho hoạt động ngoài trời'], 'Trung bình': ['Người nhạy cảm nên hạn chế ở ngoài trời', 'Cân nhắc dùng máy lọc không khí'], 'Có hại cho nhóm nhạy cảm': ['Nhóm nhạy cảm nên tránh ra ngoài', 'Đeo khẩu trang khi cần thiết'], 'Có hại cho sức khỏe': ['Hạn chế hoạt động ngoài trời', 'Đeo khẩu trang N95 khi ra ngoài'], 'Rất có hại': ['Tránh hoàn toàn hoạt động ngoài trời', 'Ở trong nhà và đóng kín cửa'], 'Nguy hiểm': ['Tình trạng khẩn cấp - ở trong nhà!', 'Bật máy lọc không khí ở chế độ cao'] };
+            titleEl.innerHTML = `<i class="fas fa-info-circle me-2"></i> ${level}`;
+            titleEl.style.color = color;
+            document.getElementById('pollutionMessage').textContent = `Chất lượng không khí hiện tại ở mức ${level.toLowerCase()}.`;
+            document.getElementById('recommendations').innerHTML = (recommendations[level] || []).map(r => `<li>${r}</li>`).join('');
+        }
+
+        function getAqiColor(level) { 
+            const colorMap = { 'Tốt': '#28a745', 'Trung bình': '#ffc107', 'Có hại cho nhóm nhạy cảm': '#fd7e14', 'Có hại cho sức khỏe': '#dc3545', 'Rất có hại': '#6f42c1', 'Nguy hiểm': '#8e44ad' };
+            return colorMap[level] || '#343a40';
+        }
+
+        function getHealthScoreInfo(score) { 
+            if (score <=50) return { level: 'Tuyệt vời', color: '#28a745' };
+            if (score <=60) return { level: 'Tốt', color: '#17a2b8' };
+            if (score <=70) return { level: 'Trung bình', color: '#ffc107' };
+            if (score <=80) return { level: 'Cần chú ý', color: '#fd7e14' };
+            return { level: 'Xấu', color: '#dc3545' };
+        }
+
+        function getWeatherIcon(conditionText) { 
+            const condition = conditionText.toLowerCase();
+            if (condition.includes('thunder')) return '🌩️'; if (condition.includes('rain') || condition.includes('shower')) return '🌧️';
+            if (condition.includes('sunny') || condition.includes('clear')) return '☀️'; if (condition.includes('cloudy')) return '☁️';
+            if (condition.includes('partly cloudy')) return '🌥️'; if (condition.includes('mist') || condition.includes('fog')) return '🌫️';
+            return '❓';
+        }
+
+        function initCharts() { 
+            const radialOptions = { responsive: true, maintainAspectRatio: false, cutout: '80%', rotation: -90, circumference: 360, plugins: { tooltip: { enabled: false } } };
+            aqiGaugeChart = new Chart(document.getElementById('aqiGauge').getContext('2d'), { type: 'doughnut', data: { datasets: [{ data: [0, 300], backgroundColor: ['#28a745', '#e9ecef'], borderWidth: 0, borderRadius: 20 }] }, options: { ...radialOptions, plugins: { ...radialOptions.plugins, customOptions: { maxValue: 300 } } } });
+            healthGaugeChart = new Chart(document.getElementById('healthScoreGauge').getContext('2d'), { type: 'doughnut', data: { datasets: [{ data: [0, 100], backgroundColor: ['#28a745', '#e9ecef'], borderWidth: 0, borderRadius: 20 }] }, options: { ...radialOptions, plugins: { ...radialOptions.plugins, customOptions: { maxValue: 100 } } } });
+            forecastChart = new Chart(document.getElementById('forecastChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [ { type: 'line', label: 'Nhiệt độ (°C)', data: [], borderColor: '#dc3545', backgroundColor: '#dc3545', yAxisID: 'yTemp', tension: 0.4, borderWidth: 3 }, { type: 'bar', label: 'Khả năng mưa (%)', data: [], backgroundColor: 'rgba(54, 162, 235, 0.2)', yAxisID: 'yRain', barPercentage: 0.8, categoryPercentage: 0.9 } ]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { display: false } }, yTemp: { type: 'linear', position: 'left', title: { display: true, text: 'Nhiệt độ (°C)' }, grid: { drawOnChartArea: false } }, yRain: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: 'Khả năng mưa (%)' }, grid: { display: false } } }, plugins: { tooltip: { callbacks: { label: function(context) { if (context.dataset.type === 'line') return `Nhiệt độ: ${context.formattedValue}°C`; if (context.dataset.type === 'bar') return `Khả năng mưa: ${context.formattedValue}%`; return ''; }, afterLabel: function(context) { const customData = context.chart.options.plugins.tooltip.customData; if (customData && customData[context.dataIndex]) { const condition = customData[context.dataIndex]; return `${getWeatherIcon(condition)} ${condition}`; } return ''; } } } } } });
+        }
+
+        function toggleAutoRefresh() { 
+            isAutoRefresh = !isAutoRefresh;
+            const button = document.querySelector('button[onclick="toggleAutoRefresh()"]');
+            const text = document.getElementById('autoRefreshText');
+            const icon = button.querySelector('i');
+            if (isAutoRefresh) {
+                fetchAllData(); autoRefreshInterval = setInterval(fetchAllData, 30000);
+                text.textContent = 'Tắt Tự động làm mới'; icon.className = 'fas fa-pause me-2'; button.className = 'btn btn-warning ms-2';
+            } else {
+                clearInterval(autoRefreshInterval);
+                text.textContent = 'Bật Tự động làm mới'; icon.className = 'fas fa-play me-2'; button.className = 'btn btn-success ms-2';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            fetchAllData();
+        });
+    </script>
+</body>
+</html>
